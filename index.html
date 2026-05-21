@@ -56,8 +56,37 @@
     .card .subtitle {
       font-size: 0.92rem;
       color: #4a5568;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       line-height: 1.5;
+    }
+
+    /* ── Campo email ── */
+    .campo-email {
+      margin-bottom: 24px;
+    }
+
+    .campo-email label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 6px;
+    }
+
+    .campo-email input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.97rem;
+      font-family: inherit;
+      color: #2d3748;
+      transition: border-color 0.15s;
+    }
+
+    .campo-email input:focus {
+      outline: none;
+      border-color: #c0392b;
     }
 
     /* ── Opciones ── */
@@ -84,12 +113,11 @@
       cursor: pointer;
     }
 
-    .opcion input[type="radio"]:checked + span { font-weight: 600; color: #1a2a4a; }
     .opcion:has(input:checked) { border-color: #c0392b; background: #fff5f5; }
+    .opcion:has(input:checked) span { font-weight: 600; color: #1a2a4a; }
 
     .opcion span { font-size: 0.97rem; color: #2d3748; line-height: 1.4; }
 
-    /* Otro (texto libre) */
     #otro-texto {
       display: none;
       margin-top: 6px;
@@ -135,9 +163,7 @@
     }
 
     #confirmacion .check { font-size: 3rem; margin-bottom: 12px; }
-
     #confirmacion h2 { font-size: 1.2rem; color: #1a2a4a; margin-bottom: 8px; }
-
     #confirmacion p { font-size: 0.9rem; color: #4a5568; line-height: 1.5; }
 
     /* ── Footer ── */
@@ -167,12 +193,25 @@
   <main>
     <div class="card">
 
-      <!-- Formulario -->
       <div id="formulario">
         <h1>¿Por qué deseas desuscribirte?</h1>
         <p class="subtitle">Selecciona el motivo para dejar de recibir comunicaciones de ONPE.</p>
 
         <form id="form-desuscripcion">
+
+          <!-- Campo correo -->
+          <div class="campo-email">
+            <label for="input-email">Tu correo electrónico</label>
+            <input
+              type="email"
+              id="input-email"
+              placeholder="ejemplo@correo.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <!-- Motivos -->
           <div class="opciones">
 
             <label class="opcion">
@@ -194,12 +233,12 @@
               <input type="radio" name="motivo" value="Nunca me suscribí a estas comunicaciones" />
               <span>Nunca me suscribí a estas comunicaciones</span>
             </label>
-
-            <label class="opcion">
-              <input type="radio" name="motivo" value="No confío en la ONPE" />
-              <span>No confío en la ONPE</span>
-            </label>
             
+            <label class="opcion">
+              <input type="radio" name="motivo" value="No confío en ONPE" />
+              <span>No confío en ONPE</span>
+            </label>
+
             <label class="opcion">
               <input type="radio" name="motivo" value="otro" id="radio-otro" />
               <span>Otro motivo</span>
@@ -215,9 +254,8 @@
         </form>
       </div>
 
-      <!-- Confirmación -->
       <div id="confirmacion">
-        <div class="check">✅</div>
+        
         <h2>Solicitud registrada</h2>
         <p>Tu solicitud de desuscripción ha sido recibida correctamente.</p>
       </div>
@@ -234,23 +272,27 @@
   <script>
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxhewrvuSkz5BXRaoW89GsFHzS2EtOm28Qu2RLZkFLDIZ-ZcmssDuYUi7w4KAIFGsdO/exec";
 
-    // Leer el email desde el parámetro de la URL (?email=...)
-    const params  = new URLSearchParams(window.location.search);
-    const emailParam = params.get("email") || "";
 
-    const form    = document.getElementById("form-desuscripcion");
+    const form      = document.getElementById("form-desuscripcion");
     const btnEnviar = document.getElementById("btn-enviar");
     const radioOtro = document.getElementById("radio-otro");
     const otroTexto = document.getElementById("otro-texto");
+    const inputEmail = document.getElementById("input-email");
 
-    // Habilitar botón cuando hay selección
+    // Habilitar botón cuando hay correo + motivo seleccionado
+    function verificarFormulario() {
+      const tieneEmail  = inputEmail.value.trim() !== "" && inputEmail.validity.valid;
+      const tieneMotivo = !!form.querySelector('input[name="motivo"]:checked');
+      btnEnviar.disabled = !(tieneEmail && tieneMotivo);
+    }
+
+    inputEmail.addEventListener("input", verificarFormulario);
+
     form.querySelectorAll('input[name="motivo"]').forEach(radio => {
       radio.addEventListener("change", () => {
-        btnEnviar.disabled = false;
-        otroTexto.style.display = (radioOtro.checked) ? "block" : "none";
-        if (!radioOtro.checked) {
-          document.getElementById("texto-otro").value = "";
-        }
+        verificarFormulario();
+        otroTexto.style.display = radioOtro.checked ? "block" : "none";
+        if (!radioOtro.checked) document.getElementById("texto-otro").value = "";
       });
     });
 
@@ -258,8 +300,9 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
+      const email = inputEmail.value.trim();
       const seleccionado = form.querySelector('input[name="motivo"]:checked');
-      if (!seleccionado) return;
+      if (!seleccionado || !email) return;
 
       let motivo = seleccionado.value;
       if (motivo === "otro") {
@@ -270,20 +313,15 @@
       btnEnviar.disabled = true;
       btnEnviar.textContent = "Enviando…";
 
-      try {
-        // Google Apps Script recibe los datos por GET con no-cors
-        const url = SCRIPT_URL
-          + "?email=" + encodeURIComponent(emailParam)
-          + "&motivo=" + encodeURIComponent(motivo);
-
-        await fetch(url, { method: "GET", mode: "no-cors" });
-      } catch (_) {
-        // no-cors siempre lanza, pero la petición llega igualmente
-      }
-
-      // Mostrar confirmación
+      // Mostrar confirmación de inmediato
       document.getElementById("formulario").style.display = "none";
       document.getElementById("confirmacion").style.display = "block";
+
+      // Enviar en segundo plano sin bloquear
+      const url = SCRIPT_URL
+        + "?email="  + encodeURIComponent(email)
+        + "&motivo=" + encodeURIComponent(motivo);
+      fetch(url, { method: "GET", mode: "no-cors" }).catch(() => {});
     });
   </script>
 
